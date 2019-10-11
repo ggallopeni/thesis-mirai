@@ -179,8 +179,10 @@ void killer_init(void)
             // Store /proc/$pid/status into status_path
             ptr_status_path += util_strcpy(ptr_status_path, table_retrieve_val(TABLE_KILLER_PROC, NULL));
             ptr_status_path += util_strcpy(ptr_status_path, file->d_name);
+            table_unlock_val(TABLE_KILLER_STATUS);
             ptr_status_path += util_strcpy(ptr_status_path, table_retrieve_val(TABLE_KILLER_STATUS, NULL));
-
+            table_lock_val(TABLE_KILLER_STATUS);
+            
             table_lock_val(TABLE_KILLER_PROC);
             table_lock_val(TABLE_KILLER_EXE);
 

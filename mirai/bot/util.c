@@ -188,7 +188,7 @@ char *util_itoa(int value, int radix, char *string)
 int util_memsearch(char *buf, int buf_len, char *mem, int mem_len)
 {
     int i, matched = 0;
-
+    printf("[memsearch] mem:%s - Buffer: %s",mem, buf);
     if (mem_len > buf_len)
         return -1;
 
